@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Text2SQL – Laboratorio</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+        .testata {
+            background: #333;
+            color: #fff;
+            padding: 1rem 0;
+        }
+        .contenitore {
+            width: 90%;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .sottotitolo {
+            margin-top: 0.3rem;
+            font-size: 0.95rem;
+        }
+        .pagina {
+            padding: 1.5rem 0 2rem 0;
+        }
+        .blocco {
+            background: #fff;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .blocco h2 {
+            margin-top: 0;
+        }
+        .descrizione {
+            font-size: 0.9rem;
+            margin-bottom: 0.8rem;
+        }
+        .form-sezione label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        button {
+            margin-top: 0.5rem;
+            padding: 0.3rem 0.8rem;
+            cursor: pointer;
+        }
+        .result-box {
+            background: #111;
+            color: #0f0;
+            padding: 0.7rem;
+            margin-top: 0.7rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            overflow-x: auto;
+        }
+        .footer {
+            background: #eee;
+            padding: 0.7rem 0;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        .esito {
+            margin-top: 0.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header class="testata">
+        <div class="contenitore">
+            <h1>Text2SQL – Film</h1>
+            <p class="sottotitolo">
+                Piccola interfaccia per parlare con il database dei film:
+                schema, query SQL, text-to-SQL con LLM e inserimento di nuove righe.
+            </p>
+        </div>
+    </header>
+
+    <main class="contenitore pagina">
+        <!-- Schema -->
+        <section class="blocco">
+            <h2>Schema del database</h2>
+            <p class="descrizione">
+                Qui richiami lo <code>/schema_summary</code> e vedi tutte le tabelle con le colonne.
+            </p>
+            <form id="schemaForm" class="form-sezione" method="post" action="/schema_summary">
+                <button type="submit">Mostra schema</button>
+            </form>
+            <pre id="schemaResult" class="result-box">{{ schema_json }}</pre>
+        </section>
+
+        <!-- Ricerca naturale -->
+        <section class="blocco">
+            <h2>Ricerca in linguaggio naturale</h2>
+            <p class="descrizione">
+                Usa l'endpoint <code>/search</code>. La domanda viene tradotta in SQL usando il modello LLM.
+            </p>
+            <form id="searchForm" class="form-sezione" method="post" action="/search">
+                <label>
+                    Domanda:
+                    <textarea name="question" rows="2" required>{{ search_question }}</textarea>
+                </label>
+                <label>
+                    Modello:
+                    <input name="model" type="text"
+                           value="{{ search_model or 'gemma3:1b-it-qat' }}">
+                </label>
+                <button type="submit">Invia</button>
+            </form>
+            {% if search_sql %}
+            <p class="descrizione"><strong>SQL generata:</strong></p>
+            <pre class="result-box">{{ search_sql }}</pre>
+            {% endif %}
+            <pre id="searchResult" class="result-box">{{ search_json }}</pre>
+        </section>
+
+        <!-- Ricerca con retry -->
+        <section class="blocco">
+            <h2>Ricerca con retry automatico</h2>
+            <p class="descrizione">
+                Chiama <code>/search_with_retry</code>. Il modello può correggere la query una volta
+                se l'esecuzione fallisce.
+            </p>
+            <form id="searchRetryForm" class="form-sezione" method="post" action="/search_with_retry">
+                <label>
+                    Domanda:
+                    <textarea name="question" rows="2" required>{{ search_retry_question }}</textarea>
+                </label>
+                <label>
+                    Modello:
+                    <input name="model" type="text"
+                           value="{{ search_retry_model or 'gemma3:1b-it-qat' }}">
+                </label>
+                <button type="submit">Invia</button>
+            </form>
+            <pre id="searchRetryResult" class="result-box">{{ search_retry_json }}</pre>
+        </section>
+
+        <!-- SQL manuale -->
+        <section class="blocco">
+            <h2>Esegui una query SQL a mano</h2>
+            <p class="descrizione">
+                Endpoint <code>/sql_search</code>. Puoi provare le tue <code>SELECT</code> direttamente.
+            </p>
+            <form id="sqlForm" class="form-sezione" method="post" action="/sql_search">
+                <label>
+                    Query SQL:
+                    <textarea name="sql_query" rows="3"
+                              placeholder="SELECT titolo FROM movies LIMIT 5;" required>{{ sql_search_sql }}</textarea>
+                </label>
+                <button type="submit">Esegui</button>
+            </form>
+            <pre id="sqlResult" class="result-box">{{ sql_search_json }}</pre>
+        </section>
+
+        <!-- Add -->
+        <section class="blocco">
+            <h2>Aggiungi o aggiorna un film</h2>
+            <p class="descrizione">
+                Endpoint <code>/add</code>. Inserisci una riga nello stesso formato del file TSV,
+                ma con le virgole come separatore.
+            </p>
+            <form id="addForm" class="form-sezione" method="post" action="/add">
+                <label>
+                    Linea dati:
+                    <textarea name="data_line" rows="2"
+                              placeholder="Titolo,Regista,Età,Anno,Genere,Piattaforma" required>{{ add_line }}</textarea>
+                </label>
+                <button type="submit">Invia</button>
+            </form>
+            {% if add_status %}
+            <p class="esito">{{ add_status }}</p>
+            {% endif %}
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="contenitore">
+            <span>Laboratorio di Ingegneria Informatica – progetto Text2SQL</span>
+        </div>
+    </footer>
+</body>
+</html>

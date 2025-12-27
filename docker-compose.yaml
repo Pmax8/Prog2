@@ -1,0 +1,66 @@
+services:
+  
+  mariadb:
+    image: mariadb:11
+    container_name: lab_mariadb
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpassword
+      MARIADB_DATABASE: labdb
+      MARIADB_USER: labuser
+      MARIADB_PASSWORD: labpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+      - ./mariadb_init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-ulabuser", "-plabpassword"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lab_ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+
+
+
+  backend:
+    build: ./backend
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_USER: labuser
+      DB_PASSWORD: labpassword
+      DB_NAME: labdb
+      OLLAMA_URL: http://ollama:11434/api/chat
+      DEFAULT_LLM_MODEL: gemma3:1b-it-qat
+    ports:
+      - "8003:8000"
+    volumes:
+      - ./data.tsv:/app/data.tsv:ro
+  
+
+    
+    
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "8004:8000"
